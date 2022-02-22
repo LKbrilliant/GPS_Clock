@@ -1,45 +1,76 @@
-/*
-    Code By:  LKBrilliant
-    Date:     19.01.2022
+/* ▄▄▄▄▄▄▄ ▄▄▄▄▄▄▄ ▄▄▄▄▄▄▄    ▄▄▄▄▄▄▄ ▄▄▄     ▄▄▄▄▄▄▄ ▄▄▄▄▄▄▄ ▄▄▄   ▄
+  █       █       █       █  █       █   █   █       █       █   █ █ █
+  █   ▄▄▄▄█    ▄  █  ▄▄▄▄▄█  █       █   █   █   ▄   █       █   █▄█ █
+  █  █  ▄▄█   █▄█ █ █▄▄▄▄▄   █     ▄▄█   █   █  █ █  █     ▄▄█      ▄█
+  █  █ █  █    ▄▄▄█▄▄▄▄▄  █  █    █  █   █▄▄▄█  █▄█  █    █  █     █▄
+  █  █▄▄█ █   █    ▄▄▄▄▄█ █  █    █▄▄█       █       █    █▄▄█    ▄  █
+  █▄▄▄▄▄▄▄█▄▄▄█   █▄▄▄▄▄▄▄█  █▄▄▄▄▄▄▄█▄▄▄▄▄▄▄█▄▄▄▄▄▄▄█▄▄▄▄▄▄▄█▄▄▄█ █▄█
 
+   Project:     GPS CLOCK
+   version:     1.0.0
+   Institution: University of Kelaniya
+   Code By:     Anuradha Gunawardhana
+   Date:        12.02.2022
       __a__
    f |     | b
      |__g__|
    e |     | c
      |_____|
         d
+  --------------------------------------------------------------------------------------
+  Libraries: RTCLib(v2.0.2) by Adafruit: https://github.com/adafruit/RTClib
+             TinyGPS++ (v1.0.2) by mikalhart : https://github.com/mikalhart/TinyGPSPlus
+  --------------------------------------------------------------------------------------
+  MIT License
 
-   Initial time set : 2022/01/19 - 15:00
+  Copyright (c) 2022 Anuradha Gunawardhana
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.
 */
 
 #include "RTClib.h"
-
 #include <TinyGPS++.h>
 #include <SoftwareSerial.h>
 
-#define digitDelay  5
-#define ani_delay   500
-#define dots_pin    2
+#define digitDelay  5         // Digit show time in miliseconds
+// #define ani_delay   500
+#define dots_pin    2         // Hours minutes separate dots 
 #define S_RX        A0
-#define S_TX        A1
+#define S_TX        A2
 
-#define stop_h    0
-#define stop_m    5
+// Updating the time at stop_h hours and stop_m minutes every day
+#define stop_h    12
+#define stop_m    38
 
 
 TinyGPSPlus gps;
-
-SoftwareSerial SoftSerial(S_RX, S_TX);
-
 RTC_DS1307 rtc;
+SoftwareSerial SoftSerial(S_RX, S_TX);
 
 byte tens, ones;
 int Y = 0, M = 0, D = 0, h = 0, m = 0, s = 0;
 unsigned long t = 0;
-boolean debug = true;
+boolean debug = false;
 boolean timeUpdated = false;
+boolean gotGPS_time = false;
 
-// {a, b, c, d, e, f, g}
+//                     {a, b, c, d, e, f, g}
 const byte seg_pin[] = {9, 8, 7, 6, 5, 4, 3};
 
 const byte digitPin[] = {10, 11, 12, 13};
@@ -66,39 +97,43 @@ void setup() {
   for (byte i = 0; i <= 3; i++) {
     digitalWrite(digitPin[i], HIGH);
   }
+  pinMode(A1, INPUT);                 // Time update Button with external 10k pullup
 
   if (! rtc.begin()) {
     if (debug) {
       Serial.println("Couldn't find RTC");
       Serial.flush();
     }
-    while (1) delay(10);
   }
   initial_display();
+  delay(1000);
 }
 
 void loop() {
   DateTime now = rtc.now();
-  if (now.hour() == stop_h && now.minute() == stop_m && !timeUpdated) {
+  if ((now.hour() == stop_h && now.minute() == stop_m && !timeUpdated) || !digitalRead(A1)) {
     initial_display();
     SoftSerial.begin(9600);
-    getGPS();                 // Loop untill it gets the time data
+    getGPS();                 // Loop until it gets the time data
     SoftSerial.end();
     if (debug) {
       Serial.print(h);
       Serial.print(":");
       Serial.println(m);
     }
-    rtc.adjust(DateTime(Y, M, D, h, m, s));
-    if (debug) Serial.println("Time Updated");
-    timeUpdated = true;
+    if (gotGPS_time) {
+      rtc.adjust(DateTime(Y, M, D, h, m, s));   // Write the new date and time to the RTC
+      if (debug) Serial.println("Time Updated");
+      timeUpdated = true;
+      gotGPS_time = false;
+    }
   }
-  if (timeUpdated && now.minute() > stop_m + 10) timeUpdated = false;
+  if (timeUpdated && (now.minute() > (stop_m + 10))) timeUpdated = false; // only allow next time updating after 10m
 
-  hour(now.hour());
-  minute(now.minute());
+  hour(now.hour());         // show hours
+  minute(now.minute());     // show minutes
 
-  if (millis() - t >= 1000) {
+  if (millis() - t >= 1000) {             // Blink the middle dots
     digitalWrite(dots_pin, !digitalRead(dots_pin));
     t = millis();
   }
@@ -162,17 +197,15 @@ void minute(byte num) {
 
 void getGPS() {
   unsigned long startTime = millis();
-  while (h == 0 && m == 0) {
+  while (true) {
     if (gps.encode(SoftSerial.read())) {
       if (gps.date.isValid()) {
         Y = gps.date.year();
         M = gps.date.month();
         D = gps.date.day();
+      }
+      else if (debug) Serial.print("Date INVALID");
 
-      }
-      else {
-        if (debug) Serial.print("Date INVALID");
-      }
       if (gps.time.isValid()) {  //    Get time and compensate for GMT+5:30
         h = gps.time.hour() + 5;
         m = gps.time.minute() + 30;
@@ -183,9 +216,8 @@ void getGPS() {
         }
         if (h >= 24) h = h - 24;
       }
-      else {
-        if (debug) Serial.print("Time INVALID");
-      }
+      else if (debug) Serial.print("Time INVALID");
+
       if (debug) {
         if (gps.satellites.isValid()) {
           Serial.print("Satellites = ");
@@ -193,7 +225,14 @@ void getGPS() {
         }
         else  Serial.println("Satellites Invalid");
       }
-      if ((millis() - startTime) >= 300000) break;    // Timeout
+      if (h != 5 && m != 30 && h != 0 && m != 0) {
+        gotGPS_time = true;
+        break;                  // break if gps time received successfully
+      }
+      if ((millis() - startTime) >= 60000) {
+        gotGPS_time = false;
+        break;    // Timeout
+      }
     }
     if (debug) {
       Serial.print(Y);
