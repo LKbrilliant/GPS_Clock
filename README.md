@@ -1,7 +1,7 @@
 # GPS Clock
 
 ## Description
-The clock automatically synchronizes its time with the GPS time once everyday. If needed the time can be synchronized manually by clicking the push button on the side of the clock.
+The clock automatically synchronizes its time with the GPS time once every day. If needed, the time can be synchronized manually by clicking the push button on the side of the clock.
 
 ## Components
 1. 1 × Arduino Uno
