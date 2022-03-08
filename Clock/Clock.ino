@@ -7,10 +7,10 @@
   █▄▄▄▄▄▄▄█▄▄▄█   █▄▄▄▄▄▄▄█  █▄▄▄▄▄▄▄█▄▄▄▄▄▄▄█▄▄▄▄▄▄▄█▄▄▄▄▄▄▄█▄▄▄█ █▄█
 
    Project:     GPS CLOCK
-   version:     1.0.0
+   version:     1.0.1
    Institution: University of Kelaniya
    Code By:     Anuradha Gunawardhana
-   Date:        12.02.2022
+   Date:        08.03.2022
       __a__
    f |     | b
      |__g__|
@@ -197,7 +197,9 @@ void minute(byte num) {
 
 void getGPS() {
   unsigned long startTime = millis();
+  if (debug) Serial.print("Starting GPS Update");
   while (true) {
+    if (debug) Serial.print("Connecting... ");
     if (gps.encode(SoftSerial.read())) {
       if (gps.date.isValid()) {
         Y = gps.date.year();
@@ -223,18 +225,22 @@ void getGPS() {
           Serial.print("Satellites = ");
           Serial.println(gps.satellites.value());
         }
-        else  Serial.println("Satellites Invalid");
-      }
-      if (h != 5 && m != 30 && h != 0 && m != 0) {
-        gotGPS_time = true;
-        break;                  // break if gps time received successfully
-      }
-      if ((millis() - startTime) >= 60000) {
-        gotGPS_time = false;
-        break;    // Timeout
+        else  Serial.println("\nSatellites Invalid");
       }
     }
+    if (h != 5 && m != 30 && h != 0 && m != 0) {
+      if (debug) Serial.println("Time Received");
+      gotGPS_time = true;
+      break;                  // break if gps time received successfully
+    }
+    if ((millis() - startTime) >= 60000) {
+      if (debug) Serial.println("Timeout");
+      gotGPS_time = false;
+      break;                  // break when Timeout
+    }
+
     if (debug) {
+      Serial.print("Date & Time: ");
       Serial.print(Y);
       Serial.print("/");
       Serial.print(M);
